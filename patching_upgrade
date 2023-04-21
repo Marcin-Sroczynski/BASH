@@ -1,0 +1,136 @@
+#!/bin/bash
+
+#
+#       Marcin Sroczynski
+# Checks for patching.
+# checks :  fstab--> gpfs,db2 ; httpd service; network connection; mount -a errors; repo version
+# Run    :  yum clean all; yum repolist;
+# Create check lists: checklist-unix.sh + additional one in /tmp
+#
+
+
+touch /tmp/patching_report.txt
+echo "**  **  **  **  **  **  **  **  **  **  **  **" >> /tmp/patching_report.txt
+echo "**                                            " >> /tmp/patching_report.txt
+echo "**                 Checks-report:     " >> /tmp/patching_report.txt
+echo "**                                            " >> /tmp/patching_report.txt
+echo "**  **  **  **  **  **  **  **  ** ** ** ** **" >> /tmp/patching_report.txt
+
+WYNIK=$(cat /etc/redhat-release); echo -e "\e[7m  SYSTEM VERSION IS: $WYNIK\e[27m" >> /tmp/patching_report.txt
+uptime >> /tmp/patching_report.txt
+ENV=$(ls -l /APPL); echo -e "\e[33m  ENVIRONMENT: $ENV \e[0m" >> /tmp/patching_report.txt
+
+echo -e  "\e[7m GPFS\e[27m" >> /tmp/patching_report.txt
+GPFS=$(cat /etc/fstab |grep -i gpfs)
+if [ -z "$GPFS" ]; then
+echo -e "\e[32m No GPFS \e[0m" >> /tmp/patching_report.txt
+else
+echo -e "\e[33m YOU HAVE GPFS - Before and after reboot run : /usr/lpp/mmfs/bin/mmbuildgpl \e[0m" >> /tmp/patching_report.txt
+fi
+
+echo >> /tmp/patching_report.txt
+
+echo -e  "\e[7m DB2\e[27m" >> /tmp/patching_report.txt
+DB2=$(cat /etc/fstab |grep -i db2)
+if [ -z "$DB2" ]; then
+echo -e "\e[32m No DB2 \e[0m" >> /tmp/patching_report.txt
+else
+echo -e "\e[33m YOU HAVE DB2 - Check if you need to do something before/after \e[0m" >> /tmp/patching_report.txt
+fi
+
+echo >> /tmp/patching_report.txt
+
+echo -e  "\e[7m NETWORK CONNECTION\e[27m" >> /tmp/patching_report.txt
+nmcli con show >> /tmp/patching_report.txt
+
+echo >> /tmp/patching_report.txt
+
+systemctl daemon-reload
+
+echo >> /tmp/patching_report.txt
+
+echo -e  "\e[7m HTTPD \e[27m" >> /tmp/patching_report.txt
+#cat /var/www/html/corporate/content/belfius/about-us.sitemapv1.xml |grep -i 'www.belfius.be'
+HTTP="www.belfius.be"
+
+if [ -e /var/www/html/corporate/content/belfius/about-us.sitemapv1.xml ];
+then
+echo 'after update check 'https://www.belfius.be/about-us/nl  https://www.belfius.be/about-us/fr  https://www.belfius.be/about-us/en'' >> /tmp/patching_report.txt
+else
+echo " "
+fi
+
+echo >> /tmp/patching_report.txt
+
+HTP=$(systemctl is-enabled httpd)
+if [ -z "$HTP" ]; then
+echo -e "\e[32m No HTTPD \e[0m" >> /tmp/patching_report.txt
+else
+echo -e "\e[33m YOU HAVE HTTPD \e[0m" >> /tmp/patching_report.txt
+fi
+
+
+# https://www.belfius.be/about-us
+# https://www.belfius.be
+# https://www.belfius.be
+
+echo >> /tmp/patching_report.txt
+
+echo -e  "\e[7m REPO\e[27m" >> /tmp/patching_report.txt
+echo -e "\e[33m LAN--> 7.8-2920    DMZ-->7.9-0421    RH6--> 6.10-2920\e[0m" >> /tmp/patching_report.txt
+WYNIK=$(head -n 8 /etc/yum.repos.d/general.repo |grep http);
+echo -e "\e[36m $WYNIK\e[0m" >> /tmp/patching_report.txt
+echo >> /tmp/patching_report.txt
+echo >> /tmp/patching_report.txt
+
+
+
+yum clean all ; yum repolist
+echo
+echo
+echo '######################'
+echo -e  "\e[31m CREATING CHECK LISTS\e[0m"
+salt-call state.apply tools.softs; systemctl restart autofs; /mnt/collect/checklist-unix/checklist-unix.sh -g
+touch /tmp/checklist ; touch /tmp/checklist_after ; chmod 775 /tmp/checklist ; chmod 775 /tmp/checklist_after
+echo '#!/bin/bash' > /tmp/checklist.sh
+echo 'systemctl >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'df -h >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'cat /etc/fstab >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'ip route >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'ip addr >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'nmcli con show >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'pvs >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'lvs >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'sestatus >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'cat /etc/hosts >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'cat /etc/resolv.conf >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'cat /etc/nsswitch.conf >> /tmp/checklist' >> /tmp/checklist.sh
+echo 'firewall-cmd --list-all >> /tmp/checklist' >> /tmp/checklist.sh
+
+echo '#!/bin/bash' > /tmp/checklist_after.sh
+echo 'systemctl >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'df -h >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'cat /etc/fstab >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'ip route >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'ip addr >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'nmcli con show >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'pvs >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'lvs >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'sestatus >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'cat /etc/hosts >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'cat /etc/resolv.conf >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'cat /etc/nsswitch.conf >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+echo 'firewall-cmd --list-all >> /tmp/checklist_after' >> /tmp/checklist_after.sh
+chmod 775 /tmp/checklist.sh ; chmod 775 /tmp/checklist_after.sh;
+/tmp/checklist.sh
+
+
+echo -e  "\e[7m  CHECK LISTS CREATED\e[27m" >> /tmp/patching_report.txt
+echo -e  "\e[36m checklist-unix.sh  and additional in tmp \e[0m" >> /tmp/patching_report.txt
+
+echo "" >> /tmp/patching_report.txt
+
+echo -e "\e[7m Mount CHECK \e[27m" >> /tmp/patching_report.txt
+cat /tmp/patching_report.txt
+mount -a
+
