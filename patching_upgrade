@@ -49,16 +49,7 @@ systemctl daemon-reload
 
 echo >> /tmp/patching_report.txt
 
-echo -e  "\e[7m HTTPD \e[27m" >> /tmp/patching_report.txt
-#cat /var/www/html/corporate/content/belfius/about-us.sitemapv1.xml |grep -i 'www.belfius.be'
-HTTP="www.belfius.be"
 
-if [ -e /var/www/html/corporate/content/belfius/about-us.sitemapv1.xml ];
-then
-echo 'after update check 'https://www.belfius.be/about-us/nl  https://www.belfius.be/about-us/fr  https://www.belfius.be/about-us/en'' >> /tmp/patching_report.txt
-else
-echo " "
-fi
 
 echo >> /tmp/patching_report.txt
 
@@ -70,9 +61,6 @@ echo -e "\e[33m YOU HAVE HTTPD \e[0m" >> /tmp/patching_report.txt
 fi
 
 
-# https://www.belfius.be/about-us
-# https://www.belfius.be
-# https://www.belfius.be
 
 echo >> /tmp/patching_report.txt
 
