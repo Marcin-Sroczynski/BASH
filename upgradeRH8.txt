@@ -1,0 +1,122 @@
+#!/bin/bash
+#
+# Marcin Sroczynski
+# For upgrade RHEL7 > RHEL8
+# cat /home/sylx/upgrade/upgrade.txt
+# Functions:
+#1       check  -Create checklist , check for tomcat, check for rdist, remove general.repo
+#2       fs     -Create filesystem for leapp (20G)
+#3       patch  -update to latest RHEL7
+#4       preupgrade     -Run preupgrade
+#5       patch86        -Upgrade do 8.6
+#After final upgrade
+#6       sssd   -Restart SSSD
+#7       dimensions     -restart dimensions.service
+#8       was    -install perl-Switch.noarch
+#9       rdist  -install rdist-6.1.5-61.el7.x86_64.rpm
+
+# Create checklist , check for tomcat, remove general.repo
+check(){
+
+mkdir /home/sylx/upgrade/
+
+/home/sylx/patchingRH8.sh check
+systemctl status tomcat
+echo Iht0F1gP | passwd --stdin root
+mv /etc/yum.repos.d/general.repo /home/sylx/
+ll /management; yum list installed |grep -i rdist
+
+}
+
+
+#Create filesystem for leapp (20G)
+fs(){
+
+FS=tsylx_varlibleap
+lvcreate -n $FS -L20G rootvg; mkfs.xfs /dev/rootvg/$FS;  mkdir /var/lib/leapp
+echo "/dev/mapper/rootvg-$FS   /var/lib/leapp   xfs   defaults 0 0" >> /etc/fstab
+mount -a
+df -h /var/lib/leapp
+}
+
+
+#patch to latest RHEL7
+patch(){
+
+subscription-manager register --org="Default_Organization" --activationkey="RHEL8_InPlace_upgrade" --force ; subscription-manager release --unset
+yum update
+}
+
+
+#Run preupgrade
+preupgrade(){
+
+systemctl stop chef-client.service; systemctl stop ds_agent
+yum --enablerepo=* -y install leapp-upgrade
+tar -xzf /mnt/osoem/RHEL8/leapp-data17.tar.gz -C /etc/leapp/files
+modprobe -r floppy pata_acpi
+authconfig --enablefaillock --faillockargs="deny=5 unlock_timeout=0" --update
+mv /etc/pam.d/system-auth-ac.csd.bak /home/sylx/
+
+leapp preupgrade
+}
+
+
+#Restart SSSD
+sssd(){
+cd /var/lib/sss/db/
+rm -rf /var/lib/sss/db/*
+systemctl restart sssd; systemctl status sssd
+
+/etc/init.d/teb* status
+
+}
+
+
+#- Upgrade do 8.6
+patch86(){
+
+subscription-manager register --org="Default_Organization" --activationkey="RHEL8_LAN" --force
+#yum update --exclude=kernel*-4.18.0-372.26.1.el8_6.x86_64 --exclude=kernel*-4.18.0-372.19.1.el8_6.x86_64
+yum update --exclude=kernel*-4.18.0-372.26.1.el8_6.x86_64 --exclude=kernel*-4.18.0-372.19.1.el8_6.x86_64 --exclude=kernel*-4.18.0-425.3.1.el8.x86_64 --exclude=kernel*-4.18.0-372.32.1.el8_6.x86_64
+
+}
+
+
+#- restart dimensions
+dimensions(){
+
+systemctl status dimensions.service
+cd /APPL/SIDM/pgm/dimensions/agent/cm/lib
+mv libz.so.1 old_libz.so.1
+authconfig --enablefaillock --faillockargs="deny=5 unlock_timeout=0" --update
+systemctl restart dimensions.service; systemctl status dimensions.service
+
+ps -ef | grep dmpool
+
+}
+
+was(){
+subscription-manager register --org="Default_Organization" --activationkey="RHEL8_codeready" --force
+subscription-manager repos --enable codeready-builder-for-rhel-8-x86_64-rpms
+yum -y install perl-Switch.noarch
+
+}
+
+rdist(){
+yum localinstall /mnt/osoem/pieczj/rdist-6.1.5-61.el7.x86_64.rpm
+
+}
+
+
+"$@"
+
+
+
+
+
+
+
+
+
+
